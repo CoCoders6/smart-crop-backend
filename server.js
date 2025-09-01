@@ -1,0 +1,35 @@
+require('dotenv').config();
+const express = require('express');
+const cors = require('cors');
+const connectDB = require('./config/db');
+
+const authRoutes = require('./routes/auth');
+const fieldRoutes = require('./routes/fields');
+const weatherRoutes = require('./routes/weather');
+const advisoryRoutes = require('./routes/advisory');
+const recommendationRoutes = require('./routes/recommendation');
+
+const app = express();
+connectDB();
+
+app.use(cors());
+app.use(express.json());
+
+app.use('/api/auth', authRoutes);
+app.use('/api/fields', fieldRoutes);
+app.use('/api/weather', weatherRoutes);
+app.use('/api/advisory', advisoryRoutes);
+app.use('/api/recommendation', recommendationRoutes);
+
+// Global error handler
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).json({ success: false, error: err.message });
+});
+
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+
+app.get("/", (req, res) => {
+  res.send("Smart Crop Backend is running!");
+});
