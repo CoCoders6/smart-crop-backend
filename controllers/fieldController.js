@@ -26,3 +26,20 @@ exports.getFieldById = async (req, res) => {
     res.status(400).json({ success: false, error: err.message });
   }
 };
+
+exports.deleteField = async (req, res) => {
+  try {
+    const field = await Field.findOneAndDelete({
+      _id: req.params.id,
+      userId: req.userId, // ensure user can only delete their own field
+    });
+
+    if (!field) {
+      return res.status(404).json({ success: false, error: "Field not found" });
+    }
+
+    res.json({ success: true, message: "Field deleted successfully" });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+};

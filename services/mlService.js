@@ -5,34 +5,41 @@ const WeatherCache = require('../models/WeatherCache');
 exports.getRecommendation = async (field) => {
   try {
     // 1️⃣ Fetch weather (with cache)
-    let forecast;
+    let forecast = {};
     const cached = await WeatherCache.findOne({ location: field.location });
-    if (cached && (Date.now() - cached.updatedAt) < 3600_000) { // 1 hour
-      forecast = cached.data;
+
+    if (cached && (Date.now() - cached.updatedAt) < 3600_000) {
+      forecast = cached.data.forecast || {};
     } else {
-      forecast = await weatherService.getForecast(field.location);
+      const wx = await weatherService.getForecast(field.location);
+      forecast = wx.forecast || {};
       await WeatherCache.findOneAndUpdate(
         { location: field.location },
-        { data: forecast, updatedAt: new Date() },
+        { data: { forecast }, updatedAt: new Date() },
         { upsert: true }
       );
     }
 
-    // 2️⃣ Prepare ML payload
+    // 2️⃣ Prepare ML payload with safe defaults
     const payload = {
-      soilPh: field.soilPh,
-      N: field.N || 120,           // use DB value or fallback
-      rain: forecast.rainfall,     // real rainfall from API/cache
-      crop: field.crop || "Not specified"
+      soilPh: Number(field.soilPh) || 7.0,
+      N: Number(field.N) || 120,
+      rain: forecast.rainfall != null ? Number(forecast.rainfall.toFixed(2)) : 0,
+      temperature: forecast.temperature != null ? Number(forecast.temperature.toFixed(2)) : 30.0,
+      humidity: forecast.humidity != null ? Number(forecast.humidity.toFixed(2)) : 50.0,
+      crop: field.crop ? String(field.crop) : "Not specified"
     };
 
-    console.log("ML payload:", payload); // debug logging
+    console.log("ML payload ->", payload);
 
     // 3️⃣ Call ML service
     const res = await axios.post(`${process.env.ML_SERVICE_URL}/recommend`, payload);
 
-    // 4️⃣ Return ML recommendation
-    return res.data.recommended_crop;
+    // 4️⃣ Format recommendation
+    let recommended = res.data.recommended_crop || "No recommendation available";
+    recommended = recommended.charAt(0).toUpperCase() + recommended.slice(1);
+
+    return recommended;
 
   } catch (err) {
     console.error("ML Service error:", err.message);

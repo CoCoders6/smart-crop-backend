@@ -8,6 +8,7 @@ const fieldRoutes = require('./routes/fields');
 const weatherRoutes = require('./routes/weather');
 const advisoryRoutes = require('./routes/advisory');
 const recommendationRoutes = require('./routes/recommendation');
+const configChatbaseRoutes = require("./routes/configChatbase");
 
 const app = express();
 connectDB();
@@ -20,6 +21,7 @@ app.use('/api/fields', fieldRoutes);
 app.use('/api/weather', weatherRoutes);
 app.use('/api/advisory', advisoryRoutes);
 app.use('/api/recommendation', recommendationRoutes);
+app.use("/configChatbase", configChatbaseRoutes);
 
 // Global error handler
 app.use((err, req, res, next) => {

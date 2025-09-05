@@ -6,5 +6,6 @@ const fieldController = require('../controllers/fieldController');
 router.post('/', auth, fieldController.createField);
 router.get('/', auth, fieldController.getFields);
 router.get('/:id', auth, fieldController.getFieldById);
+router.delete('/:id', auth, fieldController.deleteField);
 
 module.exports = router;

@@ -4,46 +4,33 @@ const Advisory = require("../models/Advisory");
 const smsService = require("../services/smsService");
 const weatherService = require("../services/weatherService");
 
-// Crop-specific irrigation thresholds (mm/h or accumulated)
-const irrigationThreshold = {
-  paddy: 5,
-  wheat: 2,
-  maize: 3,
-  millets: 1,
-  barley: 2,
-  sugarcane: 6,
-  soybean: 3,
-  groundnut: 2
-};
 
-// 🔹 Generate advisory based on field and weather
-function generateAdvisory(field, weather) {
+// 🔹 Generate dynamic advisory based on field and weather
+function generateAdvisory({ rain, temperature, humidity }) {
   const advice = [];
+  
+  // 🌧️ Rain
+  if (rain < 1) advice.push("Low rain irrigate crops");
+  else if (rain <= 9) advice.push("Good rain less irrigation needed");
+  else advice.push("Heavy rain check drainage");
 
-  const crop = field.crop || "wheat";
-  const threshold = irrigationThreshold[crop] || 3;
+  // 🌡️ Temperature
+  if (temperature <= 10) advice.push("Protect crops from cold stress");
+  else if (temperature <= 20 && temperature >10) advice.push("Cold weather good for Rabi crops");
+  else if (temperature <= 30 && temperature >20) advice.push("Temperature normal crops healthy");
+  else if (temperature <= 35 && temperature >30) advice.push("Hot weather irrigate to reduce stress");
+  else advice.push("Very hot provide shade and water");
 
-  // Irrigation advisory
-  if ((weather.rainfall || 0) >= threshold) {
-    advice.push("No irrigation needed today");
-  } else {
-    advice.push("Irrigation recommended");
-  }
-
-  // Temperature advisory
-  if ((weather.temperature || 0) > 35) {
-    advice.push("Provide shade / cooling for crops");
-  }
-
-  // Soil pH advisory
-  if ((field.soilPh || 7) < 5.5) {
-    advice.push("Add lime to increase soil pH");
-  }
+  // 💧 Humidity
+  if (humidity < 50) advice.push("Low humidity irrigate more");
+  else if (humidity <= 80) advice.push("Humidity normal");
+  else advice.push("High humidity watch for fungal attack");
 
   return advice;
 }
 
-// 🔹 Create advisory (API response)
+
+// 🔹 Create advisory (API)
 exports.createAdvisory = async (req, res) => {
   const { fieldId } = req.params;
 
@@ -51,15 +38,22 @@ exports.createAdvisory = async (req, res) => {
     const field = await Field.findById(fieldId);
     if (!field) return res.status(404).json({ error: "Field not found" });
 
-    // Fetch weather for field location
-    const weather = await weatherService.getForecast(field.location);
+    const rawWeather = await weatherService.getForecast(field.location);
+const forecast = rawWeather.forecast; // ✅ extract only forecast
 
-    const advice = generateAdvisory(field, weather);
+// ✅ match the expected params for generateAdvisory
+const weather = {
+  rain: forecast.rainfall ?? 0,
+  temperature: forecast.temperature ?? 25,
+  humidity: forecast.humidity ?? 50
+};
 
-    // Optionally save advisory in DB
-    await Advisory.create({ fieldId, advisories: advice });
+const advice = generateAdvisory(weather);
 
-    res.json({ success: true, field, advice });
+    // Save advisory in DB
+    const newAdvisory = await Advisory.create({ fieldId, advisories: advice });
+
+    res.json({ success: true, field, advice: newAdvisory.advisories });
   } catch (err) {
     console.error("Advisory error:", err.message);
     res.status(500).json({ error: "Server error" });
@@ -81,7 +75,7 @@ exports.sendAdvisorySMS = async (req, res) => {
     const advice = generateAdvisory(field, weather);
 
     const phone = user.phone || "+91xxxxxxxxxx";
-    const message = `Advisory for field "${field.name}":\n${advice.join(", ")}`;
+    const message = `Advisory for field "${field.name}" (${field.crop}):\n${advice.join("\n")}`;
 
     if (process.env.TWILIO_SID && process.env.TWILIO_TOKEN && process.env.TWILIO_FROM) {
       await smsService.sendSMS(phone, message);

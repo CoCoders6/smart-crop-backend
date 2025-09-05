@@ -8,16 +8,7 @@ exports.getWeather = async (req, res) => {
 
   try {
     const forecast = await weatherService.getForecast(location);
-
-    const weatherData = {
-      location,
-      temperature: forecast.temperature,
-      humidity: forecast.humidity,
-      rainfall: forecast.rainfall, // include rainfall now
-      description: forecast.description,
-    };
-
-    res.json(weatherData);
+    res.json(forecast);
   } catch (err) {
     console.error(err.message);
     res.status(500).json({ error: "Failed to fetch weather data" });
